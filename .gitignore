@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+dist/
+build/
+*.egg-info/
+.venv/
+venv/
+src/fast_ai_detector/assets/models/*.pt
+src/fast_ai_detector/assets/models/*.safetensors
