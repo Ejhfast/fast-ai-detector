@@ -7,6 +7,7 @@ __pycache__/
 .coverage
 dist/
 build/
+outputs/
 *.egg-info/
 .venv/
 venv/

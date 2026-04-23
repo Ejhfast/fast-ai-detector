@@ -30,5 +30,7 @@ where = ["src"]
 fast_ai_detector = [
   "assets/manifest.json",
   "assets/models/*.npz",
+  "assets/percentiles/*.npz",
+  "assets/percentiles/*.json",
   "assets/tokenizer/*",
 ]

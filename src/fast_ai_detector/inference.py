@@ -15,18 +15,21 @@ from .models import (
     resolve_device,
     tokenize_batch,
 )
+from .percentiles import load_percentile_artifact_for_mode, score_percentiles
 
 
 @dataclass
 class PredictionBatch:
     labels: list[str]
     scores: list[float]
+    pcts: list[float]
 
 
 class FastAIDetector:
-    def __init__(self, mode: Mode = "unsupervised", device: str = "auto"):
+    def __init__(self, mode: Mode = "unsupervised", device: str = "auto", load_percentiles: bool = True):
         self.mode = mode
         self.device = resolve_device(device)
+        self.percentile_artifact = load_percentile_artifact_for_mode(mode) if load_percentiles else None
         if mode == "unsupervised":
             self.state = load_unsupervised_state(self.device)
         elif mode == "raid-finetune":
@@ -77,6 +80,13 @@ class FastAIDetector:
             scores = self._score_unsupervised(clean_texts, batch_size=batch_size)
         else:
             scores = self._score_finetune(clean_texts, batch_size=batch_size)
+        if self.percentile_artifact is None:
+            pcts_np = np.full(len(scores), np.nan, dtype=np.float64)
+        else:
+            pcts_np = score_percentiles(np.asarray(scores, dtype=np.float64), self.percentile_artifact)
         labels = ["ai" if score >= 0 else "human" for score in scores]
-        return PredictionBatch(labels=labels, scores=[float(score) for score in scores])
-
+        return PredictionBatch(
+            labels=labels,
+            scores=[float(score) for score in scores],
+            pcts=[float(value) for value in pcts_np],
+        )

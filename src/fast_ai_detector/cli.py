@@ -12,6 +12,7 @@ from .inference import FastAIDetector
 
 DEFAULT_LABEL_COLUMN = "fast_ai_detector_label"
 DEFAULT_SCORE_COLUMN = "fast_ai_detector_score"
+DEFAULT_SCALE_COLUMN = "fast_ai_detector_human_ai_scale"
 COMMON_TEXT_COLUMNS = ("text", "generation", "content", "body", "prompt")
 
 
@@ -23,6 +24,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--text-column", default=None)
     parser.add_argument("--label-column", default=DEFAULT_LABEL_COLUMN)
     parser.add_argument("--score-column", default=DEFAULT_SCORE_COLUMN)
+    parser.add_argument("--human-ai-scale-column", default=DEFAULT_SCALE_COLUMN)
     parser.add_argument("--output", default=None, help="Optional output .csv or .tsv path for file mode.")
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--text", default=None, help="Direct text to score.")
@@ -61,6 +63,7 @@ def score_direct_text(detector: FastAIDetector, text: str, batch_size: int) -> i
         "mode": detector.mode,
         "label": result.labels[0],
         "score": result.scores[0],
+        "human_ai_scale": result.pcts[0],
     }
     print(json.dumps(payload, ensure_ascii=True))
     return 0
@@ -73,6 +76,7 @@ def score_file(
     text_column: str | None,
     label_column: str,
     score_column: str,
+    human_ai_scale_column: str,
     batch_size: int,
 ) -> int:
     sep = detect_sep(input_path)
@@ -82,6 +86,7 @@ def score_file(
     scored = frame.copy()
     scored[label_column] = predictions.labels
     scored[score_column] = predictions.scores
+    scored[human_ai_scale_column] = predictions.pcts
 
     if output_path is None:
         scored.to_csv(sys.stdout, sep=sep, index=False)
@@ -105,10 +110,10 @@ def main() -> int:
         text_column=args.text_column,
         label_column=args.label_column,
         score_column=args.score_column,
+        human_ai_scale_column=args.human_ai_scale_column,
         batch_size=args.batch_size,
     )
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

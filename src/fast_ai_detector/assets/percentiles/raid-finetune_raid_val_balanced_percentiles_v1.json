@@ -1,0 +1,37 @@
+{
+  "approximation": {
+    "pct_mae": 0.05642992533355533,
+    "pct_max_abs_err": 0.25370789732496135,
+    "pct_p95_abs_err": 0.15161763958056973
+  },
+  "artifact_path": "/home/ethan/vcreate/quick_analyses/4-11-26-mem-imag-interp/fast-ai-detector/src/fast_ai_detector/assets/percentiles/raid-finetune_raid_val_balanced_percentiles_v1.npz",
+  "metadata": {
+    "csv_path": "/home/ethan/vcreate/quick_analyses/4-11-26-mem-imag-interp/data/raid/train_shuffled_seed0.csv",
+    "logit_limit": 8.0,
+    "n_reference_ai": 31790,
+    "n_reference_human": 31790,
+    "n_reference_total": 63580,
+    "n_val_ai": 1091123,
+    "n_val_human": 31790,
+    "n_val_total": 1122913,
+    "num_knots_requested": 257,
+    "random_state": 0,
+    "reference_seed": 0,
+    "sample_fraction": 1.0,
+    "student_feature_file": "/home/ethan/vcreate/quick_analyses/4-11-26-mem-imag-interp/replicate_gemma_4_13/outputs/feature_cache/student_raid_train_shuffled_seed0_1024student_final_full/student_layer17_mean_resid_fp32.npy",
+    "student_metadata_csv": "/home/ethan/vcreate/quick_analyses/4-11-26-mem-imag-interp/replicate_gemma_4_13/outputs/feature_cache/student_raid_train_shuffled_seed0_1024student_final_full/metadata.csv",
+    "test_size": 0.2,
+    "text_col": "generation",
+    "unsupervised_delta_file": "/home/ethan/vcreate/quick_analyses/4-11-26-mem-imag-interp/fast-ai-detector/src/fast_ai_detector/assets/models/raid_unsupervised_delta_v1.npz"
+  },
+  "mode": "raid-finetune",
+  "n_ai_reference": 31790,
+  "n_human_reference": 31790,
+  "n_negative_knots": 254,
+  "n_positive_knots": 242,
+  "reference_name": "raid_val_balanced_seed0",
+  "score_max": 202.0,
+  "score_mean_ai": 41.45633748676388,
+  "score_mean_human": -9.932776800001443,
+  "score_min": -87.5
+}
