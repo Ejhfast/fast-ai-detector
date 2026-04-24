@@ -22,7 +22,7 @@ fast-ai-detector --text "This is a test."
 fast-ai-detector --mode raid-finetune --device cuda --text "This is a test."
 ```
 
-The direct-text mode prints a small human-readable TSV report by default.
+The direct-text mode prints a small human-readable aligned report by default.
 
 It also includes:
 

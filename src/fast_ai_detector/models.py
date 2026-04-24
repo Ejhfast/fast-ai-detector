@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import inspect
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
@@ -9,6 +10,7 @@ from typing import Literal
 import numpy as np
 import torch
 from huggingface_hub import hf_hub_download, try_to_load_from_cache
+from huggingface_hub.errors import LocalEntryNotFoundError
 from torch import nn
 from transformers import AutoTokenizer
 
@@ -27,22 +29,36 @@ def _download_hf_file(spec: dict[str, object]) -> Path:
     repo_id = str(spec["repo_id"])
     filename = str(spec["filename"])
     revision = spec.get("revision")
+    resolved_revision = None if revision is None else str(revision)
     cached = try_to_load_from_cache(
         repo_id=repo_id,
         filename=filename,
         repo_type="model",
-        revision=None if revision is None else str(revision),
+        revision=resolved_revision,
     )
     if isinstance(cached, str):
         return Path(cached)
-    return Path(
-        hf_hub_download(
-            repo_id=repo_id,
-            filename=filename,
-            repo_type="model",
-            revision=None if revision is None else str(revision),
+
+    # If the file is already cached locally, do not trigger a network check.
+    try:
+        return Path(
+            hf_hub_download(
+                repo_id=repo_id,
+                filename=filename,
+                repo_type="model",
+                revision=resolved_revision,
+                local_files_only=True,
+            )
         )
-    )
+    except LocalEntryNotFoundError:
+        return Path(
+            hf_hub_download(
+                repo_id=repo_id,
+                filename=filename,
+                repo_type="model",
+                revision=resolved_revision,
+            )
+        )
 
 
 def resolve_device(device: str) -> torch.device:
@@ -81,7 +97,10 @@ class MeanResidStudent(nn.Module):
             batch_first=True,
             norm_first=True,
         )
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=n_layers)
+        encoder_kwargs: dict[str, object] = {}
+        if "enable_nested_tensor" in inspect.signature(nn.TransformerEncoder).parameters:
+            encoder_kwargs["enable_nested_tensor"] = False
+        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=n_layers, **encoder_kwargs)
         self.norm = nn.LayerNorm(d_model)
         self.out = nn.Linear(d_model, output_dim)
 
