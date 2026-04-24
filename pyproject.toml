@@ -12,6 +12,7 @@ dependencies = [
   "huggingface_hub",
   "numpy",
   "pandas",
+  "safetensors",
   "torch",
   "transformers",
   "sentencepiece",
@@ -29,6 +30,8 @@ where = ["src"]
 [tool.setuptools.package-data]
 fast_ai_detector = [
   "assets/manifest.json",
+  "assets/feature_lookup/*.csv.gz",
+  "assets/feature_lookup/*.json",
   "assets/models/*.npz",
   "assets/percentiles/*.npz",
   "assets/percentiles/*.json",

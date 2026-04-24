@@ -8,6 +8,7 @@ from pathlib import Path
 import pandas as pd
 
 from .inference import FastAIDetector
+from .sae_analysis import UnsupervisedSAEExplainer, load_reduced_sae_analysis_bundle
 
 
 DEFAULT_LABEL_COLUMN = "fast_ai_detector_label"
@@ -21,6 +22,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mode", choices=["unsupervised", "raid-finetune"], default="unsupervised")
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--json", action="store_true", help="Emit JSON for --text mode instead of human-readable tables.")
+    parser.add_argument("--explain-sae", action="store_true", help="Include pooled-SAE feature analysis (unsupervised mode only).")
+    parser.add_argument("--sae-top-k", type=int, default=10)
+    parser.add_argument("--sae-output-jsonl", default=None, help="Optional JSONL sidecar path for SAE explanations in file mode.")
     parser.add_argument("--text-column", default=None)
     parser.add_argument("--label-column", default=DEFAULT_LABEL_COLUMN)
     parser.add_argument("--score-column", default=DEFAULT_SCORE_COLUMN)
@@ -57,7 +62,79 @@ def resolve_text_column(frame: pd.DataFrame, requested: str | None) -> str:
     )
 
 
-def score_direct_text(detector: FastAIDetector, text: str, batch_size: int) -> int:
+def build_sae_explainer(detector: FastAIDetector) -> UnsupervisedSAEExplainer:
+    if detector.mode != "unsupervised":
+        raise ValueError("SAE analysis is only available in unsupervised mode.")
+    bundle = load_reduced_sae_analysis_bundle(device=detector.device)
+    return UnsupervisedSAEExplainer(detector, bundle)
+
+
+def _print_aligned_table(headers: list[str], rows: list[list[object]]) -> None:
+    string_rows = [[str(value) for value in row] for row in rows]
+    widths = [len(header) for header in headers]
+    for row in string_rows:
+        for index, value in enumerate(row):
+            widths[index] = max(widths[index], len(value))
+
+    def format_row(values: list[str]) -> str:
+        return "  ".join(value.ljust(widths[index]) for index, value in enumerate(values))
+
+    print(format_row(headers))
+    for row in string_rows:
+        print(format_row(row))
+
+
+def _format_score_value(value: float) -> str:
+    return f"{value:.6f}"
+
+
+def _print_direct_text_report(
+    *,
+    detector: FastAIDetector,
+    label: str,
+    score: float,
+    human_ai_scale: float,
+    explanation: dict[str, object] | None,
+) -> None:
+    _print_aligned_table(
+        ["mode", "label", "score", "human_ai_scale"],
+        [[detector.mode, label, _format_score_value(score), _format_score_value(human_ai_scale)]],
+    )
+    if explanation is None:
+        return
+    print()
+    feature_rows: list[list[object]] = []
+    for side_key, direction in (("top_ai_features", "ai"), ("top_human_features", "human")):
+        for item in explanation.get(side_key, []):
+            if not isinstance(item, dict):
+                continue
+            feature_rows.append(
+                [
+                    direction,
+                    item.get("feature_index", ""),
+                    item.get("title", ""),
+                    _format_score_value(float(item.get("contribution", 0.0))),
+                    _format_score_value(float(item.get("share_of_side_pct", 0.0))),
+                ]
+            )
+    if not feature_rows:
+        print("No explained SAE features found.")
+        return
+    _print_aligned_table(
+        ["direction", "feature_index", "title", "contribution", "share_of_side_pct"],
+        feature_rows,
+    )
+
+
+def score_direct_text(
+    detector: FastAIDetector,
+    text: str,
+    batch_size: int,
+    *,
+    emit_json: bool,
+    explain_sae: bool,
+    sae_top_k: int,
+) -> int:
     result = detector.score_texts([text], batch_size=batch_size)
     payload = {
         "mode": detector.mode,
@@ -65,7 +142,21 @@ def score_direct_text(detector: FastAIDetector, text: str, batch_size: int) -> i
         "score": result.scores[0],
         "human_ai_scale": result.pcts[0],
     }
-    print(json.dumps(payload, ensure_ascii=True))
+    explanation_dict: dict[str, object] | None = None
+    if explain_sae:
+        explanation = build_sae_explainer(detector).explain_texts([text], batch_size=batch_size, top_k=sae_top_k)[0]
+        explanation_dict = explanation.to_dict()
+        payload["sae_analysis"] = explanation_dict
+    if emit_json:
+        print(json.dumps(payload, ensure_ascii=True))
+    else:
+        _print_direct_text_report(
+            detector=detector,
+            label=result.labels[0],
+            score=result.scores[0],
+            human_ai_scale=result.pcts[0],
+            explanation=explanation_dict,
+        )
     return 0
 
 
@@ -78,6 +169,10 @@ def score_file(
     score_column: str,
     human_ai_scale_column: str,
     batch_size: int,
+    *,
+    explain_sae: bool,
+    sae_top_k: int,
+    sae_output_jsonl: Path | None,
 ) -> int:
     sep = detect_sep(input_path)
     frame = pd.read_csv(input_path, sep=sep, low_memory=False)
@@ -87,6 +182,28 @@ def score_file(
     scored[label_column] = predictions.labels
     scored[score_column] = predictions.scores
     scored[human_ai_scale_column] = predictions.pcts
+
+    if explain_sae:
+        if sae_output_jsonl is None:
+            raise ValueError("Pass --sae-output-jsonl when using --explain-sae with file input.")
+        explanations = build_sae_explainer(detector).explain_texts(
+            frame[text_col].fillna("").astype(str).tolist(),
+            batch_size=batch_size,
+            top_k=sae_top_k,
+        )
+        sae_output_jsonl.parent.mkdir(parents=True, exist_ok=True)
+        with sae_output_jsonl.open("w", encoding="utf-8") as handle:
+            for row_index, (prediction_label, prediction_score, prediction_scale, explanation) in enumerate(
+                zip(predictions.labels, predictions.scores, predictions.pcts, explanations, strict=False)
+            ):
+                payload = {
+                    "row_index": row_index,
+                    "label": prediction_label,
+                    "score": prediction_score,
+                    "human_ai_scale": prediction_scale,
+                    "sae_analysis": explanation.to_dict(),
+                }
+                handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
 
     if output_path is None:
         scored.to_csv(sys.stdout, sep=sep, index=False)
@@ -102,7 +219,14 @@ def main() -> int:
     args = parse_args()
     detector = FastAIDetector(mode=args.mode, device=args.device)
     if args.text is not None:
-        return score_direct_text(detector, args.text, batch_size=args.batch_size)
+        return score_direct_text(
+            detector,
+            args.text,
+            batch_size=args.batch_size,
+            emit_json=bool(args.json),
+            explain_sae=bool(args.explain_sae),
+            sae_top_k=int(args.sae_top_k),
+        )
     return score_file(
         detector,
         input_path=Path(args.input),
@@ -112,6 +236,9 @@ def main() -> int:
         score_column=args.score_column,
         human_ai_scale_column=args.human_ai_scale_column,
         batch_size=args.batch_size,
+        explain_sae=bool(args.explain_sae),
+        sae_top_k=int(args.sae_top_k),
+        sae_output_jsonl=None if args.sae_output_jsonl is None else Path(args.sae_output_jsonl),
     )
 
 

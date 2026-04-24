@@ -23,10 +23,10 @@ def load_manifest() -> dict[str, object]:
     return json.loads((_assets_root() / "manifest.json").read_text(encoding="utf-8"))
 
 
-def _download_hf_bundle(bundle: dict[str, object]) -> Path:
-    repo_id = str(bundle["repo_id"])
-    filename = str(bundle["filename"])
-    revision = bundle.get("revision")
+def _download_hf_file(spec: dict[str, object]) -> Path:
+    repo_id = str(spec["repo_id"])
+    filename = str(spec["filename"])
+    revision = spec.get("revision")
     cached = try_to_load_from_cache(
         repo_id=repo_id,
         filename=filename,
@@ -196,7 +196,7 @@ def _build_student_from_checkpoint(checkpoint: dict[str, object], device: torch.
 def load_unsupervised_state(device: torch.device) -> UnsupervisedState:
     manifest = load_manifest()
     checkpoint = torch.load(
-        _download_hf_bundle(dict(manifest["student_bundle"])),
+        _download_hf_file(dict(manifest["student_bundle"])),
         map_location="cpu",
         weights_only=False,
     )
@@ -214,7 +214,7 @@ def load_unsupervised_state(device: torch.device) -> UnsupervisedState:
 def load_finetune_state(device: torch.device) -> FinetuneState:
     manifest = load_manifest()
     checkpoint = torch.load(
-        _download_hf_bundle(dict(manifest["finetune_bundle"])),
+        _download_hf_file(dict(manifest["finetune_bundle"])),
         map_location="cpu",
         weights_only=False,
     )

@@ -22,11 +22,34 @@ fast-ai-detector --text "This is a test."
 fast-ai-detector --mode raid-finetune --device cuda --text "This is a test."
 ```
 
-The direct-text mode prints a JSON object with the predicted label and score.
+The direct-text mode prints a small human-readable TSV report by default.
 
 It also includes:
 
 - `human_ai_scale`: RAID-reference scale on a `0 -> human` to `100 -> ai` axis, anchored so `50` is the score boundary
+
+To preserve machine-readable behavior for ad hoc text scoring:
+
+```bash
+fast-ai-detector --text "This is a test." --json
+```
+
+Optional pooled-SAE analysis for `unsupervised` mode:
+
+```bash
+fast-ai-detector --text "This is a test." --explain-sae --sae-top-k 5
+```
+
+This prints the score table, then a blank line, then a TSV feature table with:
+
+- `top_ai_features`: strongest AI-oriented SAE features for the document vector
+- `top_human_features`: strongest human-oriented SAE features for the document vector
+- `contribution`: heuristic pooled-SAE contribution for that feature on this document
+- `share_of_side_pct`: percent of the total absolute AI-side or human-side contribution mass
+
+The default CLI output shows explained Neuronpedia features only. Unexplained features are suppressed from the default lists.
+
+Use `--json` with `--text` if you want the SAE explanation as structured JSON instead of tables.
 
 ## Score CSV / TSV
 
@@ -43,6 +66,19 @@ fast-ai-detector --input rows.csv --text-column text --output scored.csv
 fast-ai-detector --input rows.tsv --text-column generation > scored.tsv
 ```
 
+Optional pooled-SAE explanations for file mode go to a JSONL sidecar:
+
+```bash
+fast-ai-detector \
+  --input rows.csv \
+  --output scored.csv \
+  --explain-sae \
+  --sae-top-k 5 \
+  --sae-output-jsonl scored.sae.jsonl
+```
+
+This keeps the CSV flat while writing one structured explanation object per row into the JSONL file.
+
 ## Notes
 
 - `--device auto` uses CUDA if available, otherwise CPU.
@@ -51,3 +87,5 @@ fast-ai-detector --input rows.tsv --text-column generation > scored.tsv
   `0 = strongly human side`, `50 = near boundary`, `100 = strongly AI side`.
 - `unsupervised` downloads `unignorant/fast-ai-detector`.
 - `raid-finetune` downloads `unignorant/fast-ai-detector-raid-finetune`.
+- `--explain-sae` is only supported for `unsupervised`.
+- The SAE analysis is a heuristic pooled-representation interpretation of the student-predicted layer-17 document vector, not an exact detector-score decomposition.
