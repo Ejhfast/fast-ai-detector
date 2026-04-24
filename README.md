@@ -2,8 +2,8 @@
 
 `fast-ai-detector` is a fast local CLI for scoring text as likely human- or AI-written with compact distilled models that run on CPU or GPU. The package has two modes:
 
-- `unsupervised` (default): a contrast detector in the student's residual space, with optional SAE-based document feature inspection
-- `raid-finetune`: a stronger fully supervised RAID classifier head on top of the same distilled backbone
+- `unsupervised` (default): a contrast detector with optional SAE-based document feature inspection (contrast vectors computed on RAID dataset)
+- `raid-finetune`: a stronger fully supervised classifier head on top of the same distilled backbone (trained on RAID dataset)
 
 What makes it unusual is the combination of small size and interpretability. It uses a small (40M param) distilled student model that approximates mean-pooled residual representations from a larger (4B param) Gemma model. In `unsupervised` mode, those residual-style outputs can also be annotated with SAE features from the teacher model's interpretability stack.
 
@@ -56,7 +56,7 @@ unsupervised  ai     423.319458  94.671712
 - `50` = near the decision boundary
 - `100` = strongly AI side
 
-If you want the stronger RAID-specific model instead of the default contrast model:
+If you want the RAID-specific finetune model instead of the default contrast model:
 
 ```bash
 fast-ai-detector --mode raid-finetune --device cuda --text "Your text here"
