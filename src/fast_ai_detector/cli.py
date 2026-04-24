@@ -8,7 +8,7 @@ from pathlib import Path
 import pandas as pd
 
 from .inference import FastAIDetector
-from .sae_analysis import UnsupervisedSAEExplainer, load_reduced_sae_analysis_bundle
+from .sae_analysis import UnsupervisedSAEExplainer, load_vector_sae_analysis_bundle
 
 
 DEFAULT_LABEL_COLUMN = "fast_ai_detector_label"
@@ -23,7 +23,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--json", action="store_true", help="Emit JSON for --text mode instead of human-readable tables.")
-    parser.add_argument("--explain-sae", action="store_true", help="Include pooled-SAE feature analysis (unsupervised mode only).")
+    parser.add_argument("--explain-sae", action="store_true", help="Include vector-space SAE feature analysis (unsupervised mode only).")
     parser.add_argument("--sae-top-k", type=int, default=10)
     parser.add_argument("--sae-output-jsonl", default=None, help="Optional JSONL sidecar path for SAE explanations in file mode.")
     parser.add_argument("--text-column", default=None)
@@ -65,7 +65,7 @@ def resolve_text_column(frame: pd.DataFrame, requested: str | None) -> str:
 def build_sae_explainer(detector: FastAIDetector) -> UnsupervisedSAEExplainer:
     if detector.mode != "unsupervised":
         raise ValueError("SAE analysis is only available in unsupervised mode.")
-    bundle = load_reduced_sae_analysis_bundle(device=detector.device)
+    bundle = load_vector_sae_analysis_bundle(device=detector.device)
     return UnsupervisedSAEExplainer(detector, bundle)
 
 
@@ -104,24 +104,23 @@ def _print_direct_text_report(
         return
     print()
     feature_rows: list[list[object]] = []
-    for side_key, direction in (("top_ai_features", "ai"), ("top_human_features", "human")):
-        for item in explanation.get(side_key, []):
-            if not isinstance(item, dict):
-                continue
-            feature_rows.append(
-                [
-                    direction,
-                    item.get("feature_index", ""),
-                    item.get("title", ""),
-                    _format_score_value(float(item.get("contribution", 0.0))),
-                    _format_score_value(float(item.get("share_of_side_pct", 0.0))),
-                ]
-            )
+    for item in explanation.get("top_features", []):
+        if not isinstance(item, dict):
+            continue
+        feature_rows.append(
+            [
+                item.get("feature_index", ""),
+                item.get("title", ""),
+                _format_score_value(float(item.get("state_vs_midpoint", 0.0))),
+                item.get("usual_association", ""),
+                _format_score_value(float(item.get("ai_net_push", 0.0))),
+            ]
+        )
     if not feature_rows:
         print("No explained SAE features found.")
         return
     _print_aligned_table(
-        ["direction", "feature_index", "title", "contribution", "share_of_side_pct"],
+        ["feature_index", "title", "state_vs_midpoint", "usual_assoc", "ai_net_push"],
         feature_rows,
     )
 

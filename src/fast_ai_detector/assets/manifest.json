@@ -14,12 +14,12 @@
     "filename": "raid_finetune_epoch7_compact.pt",
     "repo_id": "unignorant/fast-ai-detector-raid-finetune"
   },
-  "unsupervised_sae_analysis_bundle": {
-    "filename": "unsupervised_sae_analysis_bundle_v1.safetensors",
+  "unsupervised_sae_vector_analysis_bundle": {
+    "filename": "unsupervised_sae_vector_analysis_bundle_v2.safetensors",
     "repo_id": "unignorant/fast-ai-detector"
   },
-  "unsupervised_sae_analysis_metadata": {
-    "filename": "unsupervised_sae_analysis_bundle_v1.json",
+  "unsupervised_sae_vector_analysis_metadata": {
+    "filename": "unsupervised_sae_vector_analysis_bundle_v2.json",
     "repo_id": "unignorant/fast-ai-detector"
   },
   "tokenizer_files": [

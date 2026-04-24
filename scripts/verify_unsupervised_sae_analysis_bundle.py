@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pandas as pd
 import torch
-from safetensors.torch import load_file
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -16,21 +15,8 @@ sys.path.insert(0, str(ROOT / "src"))
 from fast_ai_detector.inference import FastAIDetector  # noqa: E402
 from fast_ai_detector.sae_analysis import (  # noqa: E402
     UnsupervisedSAEExplainer,
-    load_reduced_sae_analysis_bundle,
+    load_vector_sae_analysis_bundle,
 )
-
-
-LOCAL_RELEASE_PATHS = {
-    "gemma-scope-2-4b-pt-res-all": (
-        ROOT.parent
-        / "replicate_gemma_4_13"
-        / ".cache"
-        / "huggingface"
-        / "hub"
-        / "models--google--gemma-scope-2-4b-pt"
-        / "snapshots"
-    )
-}
 
 
 def parse_args() -> argparse.Namespace:
@@ -40,13 +26,11 @@ def parse_args() -> argparse.Namespace:
         default=str(
             ROOT
             / "outputs"
-            / "sae_analysis_bundle"
+            / "sae_vector_analysis_bundle"
             / "unsupervised_layer17_width_16k_l0_medium"
-            / "unsupervised_sae_analysis_bundle_v1.safetensors"
+            / "unsupervised_sae_vector_analysis_bundle_v2.safetensors"
         ),
     )
-    parser.add_argument("--sae-release", default="gemma-scope-2-4b-pt-res-all")
-    parser.add_argument("--sae-id", default="layer_17_width_16k_l0_medium")
     parser.add_argument(
         "--text-csv",
         default=str(ROOT.parent / "data" / "raid" / "train_shuffled_seed0.csv"),
@@ -57,23 +41,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device", default="cpu")
     parser.add_argument(
         "--output-dir",
-        default=str(ROOT / "outputs" / "sae_analysis_bundle_verification"),
+        default=str(ROOT / "outputs" / "sae_vector_analysis_bundle_verification"),
     )
     return parser.parse_args()
-
-
-def resolve_local_sae_dir(release: str, sae_id: str) -> Path:
-    if release not in LOCAL_RELEASE_PATHS:
-        raise FileNotFoundError(f"Unknown local SAE release {release!r}")
-    snapshots_root = LOCAL_RELEASE_PATHS[release]
-    matches = sorted(snapshots_root.glob(f"*/resid_post_all/{sae_id}"))
-    if not matches:
-        matches = sorted(snapshots_root.glob(f"*/resid_post/{sae_id}"))
-    if not matches:
-        raise FileNotFoundError(
-            f"Could not find cached SAE for release={release!r} sae_id={sae_id!r} under {snapshots_root}"
-        )
-    return matches[-1]
 
 
 def topk_overlap(a: torch.Tensor, b: torch.Tensor, k: int, *, largest: bool) -> float:
@@ -90,56 +60,42 @@ def main() -> None:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    texts_frame = pd.read_csv(args.text_csv, usecols=[args.text_column], nrows=args.max_texts)
-    texts = texts_frame[args.text_column].fillna("").astype(str).tolist()
+    texts = (
+        pd.read_csv(args.text_csv, usecols=[args.text_column], nrows=args.max_texts)[args.text_column]
+        .fillna("")
+        .astype(str)
+        .tolist()
+    )
 
     detector = FastAIDetector(mode="unsupervised", device=args.device, load_percentiles=False)
-    bundle = load_reduced_sae_analysis_bundle(args.bundle_path, device=detector.device, compute_dtype=torch.float32)
+    bundle = load_vector_sae_analysis_bundle(args.bundle_path, device=detector.device, compute_dtype=torch.float32)
     explainer = UnsupervisedSAEExplainer(detector, bundle)
 
     raw_reps = explainer.predict_raw_representations(texts, batch_size=8)
-    detector_scores_from_bundle = explainer.detector_scores_from_raw(raw_reps).cpu()
-    detector_scores_runtime = torch.tensor(
-        detector.score_texts(texts, batch_size=8).scores,
-        dtype=torch.float32,
-    )
-
-    sae_dir = resolve_local_sae_dir(args.sae_release, args.sae_id)
-    full_tensors = load_file(str(sae_dir / "params.safetensors"), device=str(detector.device))
-    w_enc_full = full_tensors["w_enc"].float()
-    b_enc_full = full_tensors["b_enc"].float()
-    threshold_full = full_tensors["threshold"].float()
-    w_dec_full = full_tensors["w_dec"].float()
-
-    raw_readout = bundle.raw_readout.float()
-    feature_alignment_full = (w_dec_full @ raw_readout).cpu()
-
-    full_hidden = raw_reps.float() @ w_enc_full + b_enc_full
-    full_features = torch.where(full_hidden > threshold_full, full_hidden, torch.zeros_like(full_hidden))
-    full_contributions = full_features * feature_alignment_full.to(full_features.device)
-    reduced_features = explainer.encode_raw_representations(raw_reps).cpu()
-    reduced_contributions = (reduced_features * bundle.feature_alignment.cpu()).cpu()
+    runtime_scores = torch.tensor(detector.score_texts(texts, batch_size=8).scores, dtype=torch.float32)
+    bundle_scores = explainer.detector_scores_from_raw(raw_reps).cpu()
+    state_vs_midpoint, _, ai_net_push = explainer.feature_geometry_from_raw(raw_reps)
+    state_vs_midpoint = state_vs_midpoint.cpu()
+    ai_net_push = ai_net_push.cpu()
 
     rows: list[dict[str, object]] = []
-    pos_overlaps: list[float] = []
-    neg_overlaps: list[float] = []
-    for idx, text in enumerate(texts):
-        pos_overlap = topk_overlap(full_contributions[idx], reduced_contributions[idx], args.top_k, largest=True)
-        neg_overlap = topk_overlap(full_contributions[idx], reduced_contributions[idx], args.top_k, largest=False)
-        pos_overlaps.append(pos_overlap)
-        neg_overlaps.append(neg_overlap)
+    for row_index, text in enumerate(texts):
+        row = state_vs_midpoint[row_index]
+        push_row = ai_net_push[row_index]
+        pos = torch.nonzero(push_row > 0, as_tuple=False).squeeze(-1)
+        neg = torch.nonzero(push_row < 0, as_tuple=False).squeeze(-1)
+        explanation = explainer.explain_texts([text], batch_size=1, top_k=args.top_k)[0]
         rows.append(
             {
-                "row_index": idx,
+                "row_index": row_index,
                 "text_preview": text[:200],
-                "detector_score_runtime": float(detector_scores_runtime[idx].item()),
-                "detector_score_from_bundle": float(detector_scores_from_bundle[idx].item()),
-                "feature_mae": float((reduced_features[idx] - full_features[idx].cpu()).abs().mean().item()),
-                "contribution_mae": float(
-                    (reduced_contributions[idx] - full_contributions[idx].cpu()).abs().mean().item()
-                ),
-                "top_positive_jaccard": pos_overlap,
-                "top_negative_jaccard": neg_overlap,
+                "runtime_score": float(runtime_scores[row_index].item()),
+                "bundle_score": float(bundle_scores[row_index].item()),
+                "n_positive_features": int(pos.numel()),
+                "n_negative_features": int(neg.numel()),
+                "top_explained": len(explanation.top_features),
+                "top_abs_state_self_overlap": topk_overlap(torch.abs(row), torch.abs(row), args.top_k, largest=True),
+                "top_abs_push_self_overlap": topk_overlap(torch.abs(push_row), torch.abs(push_row), args.top_k, largest=True),
             }
         )
 
@@ -148,33 +104,19 @@ def main() -> None:
 
     summary = {
         "bundle_path": str(Path(args.bundle_path).resolve()),
-        "sae_dir": str(sae_dir.resolve()),
         "text_csv": str(Path(args.text_csv).resolve()),
         "text_column": args.text_column,
         "n_texts": len(texts),
         "verification_scope": [
-            "detector raw-score consistency between runtime and bundle readout",
-            "reduced bundle vs full SAE feature activations on the same pooled/student vector",
-            "reduced bundle vs full SAE top positive/negative contribution ranking overlap",
+            "bundle detector-score consistency with runtime unsupervised scoring",
+            "non-empty state-vs-midpoint and AI-net-push rankings",
+            "explained-feature counts in the emitted top-k lists",
         ],
-        "detector_runtime_vs_bundle_max_abs_diff": float(
-            (detector_scores_runtime - detector_scores_from_bundle).abs().max().item()
-        ),
-        "detector_runtime_vs_bundle_mae": float(
-            (detector_scores_runtime - detector_scores_from_bundle).abs().mean().item()
-        ),
-        "full_vs_reduced_feature_mae": float((reduced_features - full_features.cpu()).abs().mean().item()),
-        "full_vs_reduced_feature_max_abs_diff": float(
-            (reduced_features - full_features.cpu()).abs().max().item()
-        ),
-        "full_vs_reduced_contribution_mae": float(
-            (reduced_contributions - full_contributions.cpu()).abs().mean().item()
-        ),
-        "full_vs_reduced_contribution_max_abs_diff": float(
-            (reduced_contributions - full_contributions.cpu()).abs().max().item()
-        ),
-        "mean_top_positive_jaccard": float(sum(pos_overlaps) / len(pos_overlaps)),
-        "mean_top_negative_jaccard": float(sum(neg_overlaps) / len(neg_overlaps)),
+        "score_max_abs_diff": float((runtime_scores - bundle_scores).abs().max().item()),
+        "score_mae": float((runtime_scores - bundle_scores).abs().mean().item()),
+        "mean_nonzero_state_features": float((state_vs_midpoint != 0).sum(dim=1).float().mean().item()),
+        "mean_nonzero_push_features": float((ai_net_push != 0).sum(dim=1).float().mean().item()),
+        "mean_top_explained": float(rows_frame["top_explained"].mean()),
         "top_k": int(args.top_k),
     }
     (output_dir / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")

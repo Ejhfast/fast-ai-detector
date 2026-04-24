@@ -34,7 +34,7 @@ To preserve machine-readable behavior for ad hoc text scoring:
 fast-ai-detector --text "This is a test." --json
 ```
 
-Optional pooled-SAE analysis for `unsupervised` mode:
+Optional vector-space SAE analysis for `unsupervised` mode:
 
 ```bash
 fast-ai-detector --text "This is a test." --explain-sae --sae-top-k 5
@@ -42,10 +42,9 @@ fast-ai-detector --text "This is a test." --explain-sae --sae-top-k 5
 
 This prints the score table, then a blank line, then a TSV feature table with:
 
-- `top_ai_features`: strongest AI-oriented SAE features for the document vector
-- `top_human_features`: strongest human-oriented SAE features for the document vector
-- `contribution`: heuristic pooled-SAE contribution for that feature on this document
-- `share_of_side_pct`: percent of the total absolute AI-side or human-side contribution mass
+- `state_vs_midpoint`: signed loading for how this example differs from the RAID midpoint on that SAE feature
+- `usual_assoc`: whether that feature is usually AI-associated or human-associated under the detector direction
+- `ai_net_push`: signed push on the detector in AI space for this example on that feature
 
 The default CLI output shows explained Neuronpedia features only. Unexplained features are suppressed from the default lists.
 
@@ -66,7 +65,7 @@ fast-ai-detector --input rows.csv --text-column text --output scored.csv
 fast-ai-detector --input rows.tsv --text-column generation > scored.tsv
 ```
 
-Optional pooled-SAE explanations for file mode go to a JSONL sidecar:
+Optional vector-space SAE explanations for file mode go to a JSONL sidecar:
 
 ```bash
 fast-ai-detector \
@@ -88,4 +87,4 @@ This keeps the CSV flat while writing one structured explanation object per row 
 - `unsupervised` downloads `unignorant/fast-ai-detector`.
 - `raid-finetune` downloads `unignorant/fast-ai-detector-raid-finetune`.
 - `--explain-sae` is only supported for `unsupervised`.
-- The SAE analysis is a heuristic pooled-representation interpretation of the student-predicted layer-17 document vector, not an exact detector-score decomposition.
+- The SAE analysis is a decoder-side vector-space interpretation of the example's position relative to the RAID midpoint in SAE space, annotated by detector association. It is not a probability or exact causal attribution.
