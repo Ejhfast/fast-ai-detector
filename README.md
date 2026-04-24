@@ -1,11 +1,11 @@
 # fast-ai-detector
 
-`fast-ai-detector` is a local CLI for scoring text as likely human- or AI-written with compact distilled models that run on CPU or GPU. The package has two modes:
+`fast-ai-detector` is a fast local CLI for scoring text as likely human- or AI-written with compact distilled models that run on CPU or GPU. The package has two modes:
 
 - `unsupervised` (default): a contrast detector in the student's residual space, with optional SAE-based document feature inspection
 - `raid-finetune`: a stronger fully supervised RAID classifier head on top of the same distilled backbone
 
-What makes it unusual is the combination of small size and interpretability. Instead of shipping a large teacher model, it uses a small distilled student that approximates mean-pooled residual representations from a larger Gemma model. In `unsupervised` mode, those residual-style outputs can also be annotated with SAE features from the teacher model's interpretability stack.
+What makes it unusual is the combination of small size and interpretability. It uses a small (40M param) distilled student model that approximates mean-pooled residual representations from a larger (4B param) Gemma model. In `unsupervised` mode, those residual-style outputs can also be annotated with SAE features from the teacher model's interpretability stack.
 
 Current reference numbers:
 
@@ -127,4 +127,4 @@ From there, two detector variants were built on top of the student:
 - `unsupervised`: a contrast direction learned in the student's residual space
 - `raid-finetune`: a supervised classifier head trained for the RAID benchmark
 
-The main motivation for doing this at all was not just speed. If a small model can stay close enough to the teacher representation, then some of the interpretability infrastructure built around the teacher model can still be reused. That is what powers the optional SAE annotations in `unsupervised` mode: the small model is fast enough for local use, but the outputs still live close enough to a teacher representation family that they can be inspected with the teacher's SAE dictionary.
+The main motivation for doing this at all was not just speed. If a small model can stay close enough to the teacher representation, then some of the interpretability infrastructure built around the teacher model can still be reused. That is what powers the optional SAE annotations in `unsupervised` mode: the small model is fast enough for local use, but the outputs can still be inspected with the teacher's SAE dictionary.
