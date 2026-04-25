@@ -1,11 +1,12 @@
 # fast-ai-detector
 
-`fast-ai-detector` is a fast local CLI for scoring text as likely AI-written with compact distilled models that run on CPU or GPU. The package has two modes:
+`fast-ai-detector` is a fast local CLI for scoring text as likely AI-written with models that run on CPU or GPU. 
 
-- `contrast` (default): a small transformer that produces representations that can be used for contrast-based prediction and SAE-based document feature inspection
-- `raid-finetune`: the same transformer model finetuned with a classifier head (trained on the [RAID](https://raid-bench.xyz/) dataset)
+The core model is a small distilled transformer (~40M param) that approximates mean-pooled residual representations from a larger (4B param) Gemma model. In `contrast` mode, those residual-style outputs can also be annotated with SAE features from the teacher model's interpretability stack. Contrast vectors were computed from the [RAID](https://raid-bench.xyz/) training dataset.
 
-The core model is a small distilled transformer (~40M param) that approximates mean-pooled residual representations from a larger (4B param) Gemma model. In `contrast` mode, those residual-style outputs can also be annotated with SAE features from the teacher model's interpretability stack. Contrast vectors were also computed from the RAID training dataset.
+Modes:
+- `contrast` (default): contrast-based prediction and SAE-based document feature inspection
+- `raid-finetune`: the core transformer model finetuned with a classifier head (trained on the RAID dataset)
 
 Current reference numbers:
 
