@@ -3,22 +3,24 @@
 `fast-ai-detector` is a fast local CLI for scoring text as likely AI-written with compact distilled models that run on CPU or GPU. The package has two modes:
 
 - `contrast` (default): a contrast detector with optional SAE-based document feature inspection
-- `raid-finetune`: a stronger fully supervised classifier head on top of the same distilled backbone (trained on RAID dataset)
+- `raid-finetune`: a stronger fully supervised classifier head on top of the same distilled backbone (trained on the [RAID](https://raid-bench.xyz/) dataset)
 
 The model is a small distilled transformer (~40M param) that approximates mean-pooled residual representations from a larger (4B param) Gemma model. In `contrast` mode, those residual-style outputs can also be annotated with SAE features from the teacher model's interpretability stack.
 
 Current reference numbers:
 
-| Dataset | Mode | Accuracy @ 0 | ROC-AUC | AP | TPR @ 5% FPR |
-| --- | --- | ---: | ---: | ---: | ---: |
-| RAID held-out validation | `contrast` | `0.6348` | `0.9342` | `0.99788` | `0.7631` |
-| RAID held-out validation | `raid-finetune` | `0.9805` | `0.9958` | `0.99987` | `0.9801` |
-| Pangram benchmark | `contrast` | `0.8841` | `0.9425` | `0.9470` | `0.7856` |
-| Pangram benchmark | `raid-finetune` | `0.6549` | `0.8994` | `0.9013` | `0.6466` |
+| Dataset | Mode | Balanced Accuracy | ROC-AUC | TPR @ 5% FPR |
+| --- | --- | ---: | ---: | ---: |
+| RAID held-out validation | `contrast` | `0.8078` | `0.9343` | `0.7637` |
+| RAID held-out validation | `raid-finetune` | `0.9642` | `0.9958` | `0.9801` |
+| Pangram benchmark | `contrast` | `0.8827` | `0.9425` | `0.7856` |
+| Pangram benchmark | `raid-finetune` | `0.6731` | `0.8993` | `0.6466` |
 
-For RAID, the `raid-finetune` mode is the stronger detector. The default `contrast` mode is weaker on the core benchmark, but keeps the cleaner representation-level geometry and the SAE document feature view.
+The contrast model is recommended for normal use as the raid-finetuned model seems poorly calibrated around the human/ai threshold for text that falls outside the distribution of the RAID training data. 
 
-Note: the bundled benchamrks contain little or no output from GPT-5-era systems and later, so you should not expect these scores to transfer unchanged to the latest model outputs.
+The pangram benchmark is small and included in this repo for reproducability. 
+
+Note: the bundled benchmarks contain little or no output from GPT-5-era systems and later, so you should not expect these scores to transfer unchanged to the latest model outputs.
 
 ## Installation
 

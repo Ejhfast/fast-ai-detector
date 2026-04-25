@@ -4,7 +4,7 @@
     "n_ai": 5455368,
     "n_human": 160452
   },
-  "raid_cache_dir": "/home/ethan/vcreate/quick_analyses/4-11-26-mem-imag-interp/replicate_gemma_4_13/outputs/feature_cache/student_raid_train_shuffled_seed0_1024student_final_full",
+  "raid_cache_dir": "replicate_gemma_4_13/outputs/feature_cache/student_raid_train_shuffled_seed0_1024student_final_full",
   "source_model_id": "google/gemma-3-4b-pt",
   "student_bundle": {
     "filename": "student_base_compact.pt",

@@ -6,9 +6,9 @@
     "neuronpedia_source",
     "neuronpedia_url"
   ],
-  "input_csv": "/home/ethan/vcreate/quick_analyses/4-11-26-mem-imag-interp/fast-ai-detector/outputs/neuronpedia_lookup/gemma_3_4b__17_gemmascope_2_res_16k__feature_lookup.csv",
+  "input_csv": "outputs/neuronpedia_lookup/gemma_3_4b__17_gemmascope_2_res_16k__feature_lookup.csv",
   "num_rows": 16384,
-  "output_csv_gz": "/home/ethan/vcreate/quick_analyses/4-11-26-mem-imag-interp/fast-ai-detector/src/fast_ai_detector/assets/feature_lookup/layer_17_width_16k_l0_medium_neuronpedia_lookup_v1.csv.gz",
+  "output_csv_gz": "src/fast_ai_detector/assets/feature_lookup/layer_17_width_16k_l0_medium_neuronpedia_lookup_v1.csv.gz",
   "status_counts": {
     "no_explanation": 684,
     "ok": 15700
