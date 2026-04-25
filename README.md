@@ -2,10 +2,10 @@
 
 `fast-ai-detector` is a fast local CLI for scoring text as likely AI-written with compact distilled models that run on CPU or GPU. The package has two modes:
 
-- `contrast` (default): a contrast detector with optional SAE-based document feature inspection
-- `raid-finetune`: a stronger fully supervised classifier head on top of the same distilled backbone (trained on the [RAID](https://raid-bench.xyz/) dataset)
+- `contrast` (default): a small transformer that produces representations that can be used for contrast-based prediction and SAE-based document feature inspection
+- `raid-finetune`: the same transformer model finetuned with a classifier head (trained on the [RAID](https://raid-bench.xyz/) dataset)
 
-The model is a small distilled transformer (~40M param) that approximates mean-pooled residual representations from a larger (4B param) Gemma model. In `contrast` mode, those residual-style outputs can also be annotated with SAE features from the teacher model's interpretability stack.
+The core model is a small distilled transformer (~40M param) that approximates mean-pooled residual representations from a larger (4B param) Gemma model. In `contrast` mode, those residual-style outputs can also be annotated with SAE features from the teacher model's interpretability stack. Contrast vectors were also computed from the RAID training dataset.
 
 Current reference numbers:
 
@@ -16,7 +16,7 @@ Current reference numbers:
 | Pangram benchmark | `contrast` | `0.8827` | `0.9425` | `0.7856` |
 | Pangram benchmark | `raid-finetune` | `0.6731` | `0.8993` | `0.6466` |
 
-The contrast model is recommended for normal use as the raid-finetuned model seems poorly calibrated around the human/ai threshold for text that falls outside the distribution of the RAID training data. 
+The contrast model (default) is recommended for normal use as the raid-finetuned model seems poorly calibrated around the human/ai threshold for text that falls outside the distribution of the RAID training data. 
 
 The pangram benchmark is small and included in this repo for reproducability. 
 
