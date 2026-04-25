@@ -19,7 +19,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--input-csv", required=True)
     parser.add_argument("--output-json", required=True)
-    parser.add_argument("--mode", choices=["unsupervised", "raid-finetune"], default="raid-finetune")
+    parser.add_argument("--mode", choices=["contrast", "raid-finetune"], default="raid-finetune")
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--csv-chunksize", type=int, default=4096)

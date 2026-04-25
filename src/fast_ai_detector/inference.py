@@ -26,16 +26,16 @@ class PredictionBatch:
 
 
 class FastAIDetector:
-    def __init__(self, mode: Mode = "unsupervised", device: str = "auto", load_percentiles: bool = True):
+    def __init__(self, mode: Mode = "contrast", device: str = "auto", load_percentiles: bool = True):
         self.mode = mode
         self.device = resolve_device(device)
-        self.percentile_artifact = load_percentile_artifact_for_mode(mode) if load_percentiles else None
-        if mode == "unsupervised":
+        self.percentile_artifact = load_percentile_artifact_for_mode(self.mode) if load_percentiles else None
+        if self.mode == "contrast":
             self.state = load_unsupervised_state(self.device)
-        elif mode == "raid-finetune":
+        elif self.mode == "raid-finetune":
             self.state = load_finetune_state(self.device)
         else:
-            raise ValueError(f"Unsupported mode: {mode}")
+            raise ValueError(f"Unsupported mode: {self.mode}")
 
     def _score_unsupervised(self, texts: list[str], batch_size: int) -> list[float]:
         state: UnsupervisedState = self.state
@@ -76,7 +76,7 @@ class FastAIDetector:
 
     def score_texts(self, texts: Sequence[str], batch_size: int = 64) -> PredictionBatch:
         clean_texts = ["" if text is None else str(text) for text in texts]
-        if self.mode == "unsupervised":
+        if self.mode == "contrast":
             scores = self._score_unsupervised(clean_texts, batch_size=batch_size)
         else:
             scores = self._score_finetune(clean_texts, batch_size=batch_size)

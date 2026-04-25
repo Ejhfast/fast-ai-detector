@@ -2,15 +2,21 @@
 
 `fast-ai-detector` is a fast local CLI for scoring text as likely human- or AI-written with compact distilled models that run on CPU or GPU. The package has two modes:
 
-- `unsupervised` (default): a contrast detector with optional SAE-based document feature inspection (contrast vectors computed on RAID dataset)
+- `contrast` (default): a contrast detector with optional SAE-based document feature inspection
 - `raid-finetune`: a stronger fully supervised classifier head on top of the same distilled backbone (trained on RAID dataset)
 
-What makes it unusual is the combination of small size and interpretability. It uses a small (40M param) distilled student model that approximates mean-pooled residual representations from a larger (4B param) Gemma model. In `unsupervised` mode, those residual-style outputs can also be annotated with SAE features from the teacher model's interpretability stack.
+What makes it unusual is the combination of small size and interpretability. It uses a small (40M param) distilled student model that approximates mean-pooled residual representations from a larger (4B param) Gemma model. In `contrast` mode, those residual-style outputs can also be annotated with SAE features from the teacher model's interpretability stack.
 
 Current reference numbers:
 
-- RAID held-out validation (held out 20% from train), `raid-finetune`: ROC-AUC `0.9958`, AP `0.99987`, TPR at `1%` FPR `0.9188`, TPR at `5%` FPR `0.9801`
-- Pangram benchmark, default `unsupervised`: accuracy `0.8841`, ROC-AUC `0.9423`, AP `0.9469`
+| Dataset | Mode | Accuracy @ 0 | ROC-AUC | AP | TPR @ 5% FPR |
+| --- | --- | ---: | ---: | ---: | ---: |
+| RAID held-out validation | `contrast` | `0.6348` | `0.9342` | `0.99788` | `0.7631` |
+| RAID held-out validation | `raid-finetune` | `0.9805` | `0.9958` | `0.99987` | `0.9801` |
+| Pangram benchmark | `contrast` | `0.8841` | `0.9425` | `0.9470` | `0.7856` |
+| Pangram benchmark | `raid-finetune` | `0.6549` | `0.8994` | `0.9013` | `0.6466` |
+
+For RAID, the `raid-finetune` mode is the stronger detector. The default `contrast` mode is weaker on the core benchmark, but keeps the cleaner representation-level geometry and the SAE document feature view.
 
 The bundled benchmarks here are useful sanity checks, but they are not rich in text from the newest model families. In particular, they contain little or no output from GPT-5-era systems and later, so you should not expect these scores to transfer unchanged to the latest model outputs.
 
@@ -35,8 +41,8 @@ fast-ai-detector --text "Went there 3 weeks ago, the place was jammed. Service w
 ```
 
 ```text
-mode          label  score       human_ai_scale
-unsupervised  human  -75.602432  38.080172
+mode      label  score       human_ai_scale
+contrast  human  -75.602432  38.080172
 ```
 
 AI-like Pangram review:
@@ -46,8 +52,8 @@ fast-ai-detector --text "I love these stories. The characters are complex and re
 ```
 
 ```text
-mode          label  score       human_ai_scale
-unsupervised  ai     423.319458  94.671712
+mode      label  score       human_ai_scale
+contrast  ai     423.319458  94.671712
 ```
 
 `human_ai_scale` is a RAID-reference scale, not a probability:
@@ -95,7 +101,7 @@ text,label,tags,fast_ai_detector_label,fast_ai_detector_score,fast_ai_detector_h
 
 ## SAE
 
-`unsupervised` mode can also expose document-level SAE annotations derived from the Gemma interpretability stack the student was distilled from.
+`contrast` mode can also expose document-level SAE annotations derived from the Gemma interpretability stack the student was distilled from.
 
 ```bash
 fast-ai-detector \
@@ -105,8 +111,8 @@ fast-ai-detector \
 ```
 
 ```text
-mode          label  score       human_ai_scale
-unsupervised  ai     328.589661  84.249271
+mode      label  score       human_ai_scale
+contrast  ai     328.589661  84.249271
 
 feature_index  title                              state_vs_midpoint  usual_assoc  ai_net_push
 942            categories and definitions         19.829247          ai           170.849304
@@ -124,7 +130,7 @@ This project grew out of experiments on whether much smaller models could approx
 
 From there, two detector variants were built on top of the student:
 
-- `unsupervised`: a contrast direction learned in the student's residual space
+- `contrast`: a contrast direction learned in the student's residual space
 - `raid-finetune`: a supervised classifier head trained for the RAID benchmark
 
-The main motivation for doing this at all was not just speed. If a small model can stay close enough to the teacher representation, then some of the interpretability infrastructure built around the teacher model can still be reused. That is what powers the optional SAE annotations in `unsupervised` mode: the small model is fast enough for local use, but the outputs can still be inspected with the teacher's SAE dictionary.
+The main motivation for doing this at all was not just speed. If a small model can stay close enough to the teacher representation, then some of the interpretability infrastructure built around the teacher model can still be reused. That is what powers the optional SAE annotations in `contrast` mode: the small model is fast enough for local use, but the outputs can still be inspected with the teacher's SAE dictionary.

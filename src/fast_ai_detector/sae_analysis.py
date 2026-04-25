@@ -136,8 +136,8 @@ class UnsupervisedSAEExplainer:
         detector: FastAIDetector,
         bundle: VectorSAEAnalysisBundle,
     ):
-        if detector.mode != "unsupervised":
-            raise ValueError("SAE analysis is only supported for unsupervised mode.")
+        if detector.mode != "contrast":
+            raise ValueError("SAE analysis is only supported for contrast mode.")
         state = detector.state
         if not isinstance(state, UnsupervisedState):
             raise TypeError(f"Expected UnsupervisedState, got {type(state)!r}")

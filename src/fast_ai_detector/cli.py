@@ -19,11 +19,11 @@ COMMON_TEXT_COLUMNS = ("text", "generation", "content", "body", "prompt")
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Fast local AI-text detector.")
-    parser.add_argument("--mode", choices=["unsupervised", "raid-finetune"], default="unsupervised")
+    parser.add_argument("--mode", choices=["contrast", "raid-finetune"], default="contrast")
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--json", action="store_true", help="Emit JSON for --text mode instead of human-readable tables.")
-    parser.add_argument("--explain-sae", action="store_true", help="Include vector-space SAE feature analysis (unsupervised mode only).")
+    parser.add_argument("--explain-sae", action="store_true", help="Include vector-space SAE feature analysis (contrast mode only).")
     parser.add_argument("--sae-top-k", type=int, default=10)
     parser.add_argument("--sae-output-jsonl", default=None, help="Optional JSONL sidecar path for SAE explanations in file mode.")
     parser.add_argument("--text-column", default=None)
@@ -63,8 +63,8 @@ def resolve_text_column(frame: pd.DataFrame, requested: str | None) -> str:
 
 
 def build_sae_explainer(detector: FastAIDetector) -> UnsupervisedSAEExplainer:
-    if detector.mode != "unsupervised":
-        raise ValueError("SAE analysis is only available in unsupervised mode.")
+    if detector.mode != "contrast":
+        raise ValueError("SAE analysis is only available in contrast mode.")
     bundle = load_vector_sae_analysis_bundle(device=detector.device)
     return UnsupervisedSAEExplainer(detector, bundle)
 

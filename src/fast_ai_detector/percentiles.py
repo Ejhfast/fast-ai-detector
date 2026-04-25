@@ -14,7 +14,8 @@ def _assets_root() -> Path:
 
 
 def percentile_artifact_path_for_mode(mode: str) -> Path:
-    name = f"{mode}_raid_val_balanced_percentiles_v1.npz"
+    artifact_mode = "unsupervised" if mode == "contrast" else mode
+    name = f"{artifact_mode}_raid_val_balanced_percentiles_v1.npz"
     path = _assets_root() / "percentiles" / name
     if not path.exists():
         raise FileNotFoundError(f"Missing percentile artifact for mode {mode!r}: {path}")

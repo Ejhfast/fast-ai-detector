@@ -14,7 +14,7 @@ from huggingface_hub.errors import LocalEntryNotFoundError
 from torch import nn
 from transformers import AutoTokenizer
 
-Mode = Literal["unsupervised", "raid-finetune"]
+Mode = Literal["contrast", "raid-finetune"]
 
 
 def _assets_root() -> Path:

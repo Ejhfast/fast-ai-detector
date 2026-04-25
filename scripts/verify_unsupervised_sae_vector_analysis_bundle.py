@@ -67,7 +67,7 @@ def main() -> None:
         .tolist()
     )
 
-    detector = FastAIDetector(mode="unsupervised", device=args.device, load_percentiles=False)
+    detector = FastAIDetector(mode="contrast", device=args.device, load_percentiles=False)
     bundle = load_vector_sae_analysis_bundle(args.bundle_path, device=detector.device, compute_dtype=torch.float32)
     explainer = UnsupervisedSAEExplainer(detector, bundle)
 
@@ -108,7 +108,7 @@ def main() -> None:
         "text_column": args.text_column,
         "n_texts": len(texts),
         "verification_scope": [
-            "bundle detector-score consistency with runtime unsupervised scoring",
+            "bundle detector-score consistency with runtime contrast scoring",
             "non-empty state-vs-midpoint and AI-net-push rankings",
             "explained-feature counts in the emitted top-k lists",
         ],

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "fast-ai-detector"
 version = "0.1.0"
-description = "Fast local AI-text detection with a bundled unsupervised contrast model and RAID finetune."
+description = "Fast local AI-text detection with a bundled contrast model and RAID finetune."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
