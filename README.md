@@ -1,8 +1,6 @@
 # fast-ai-detector
 
-`fast-ai-detector` is a fast local CLI for scoring text as likely AI-written with models that run on CPU or GPU. 
-
-The core model is a small distilled transformer (~40M param) that approximates mean-pooled residual representations from a larger (4B param) Gemma model. In `contrast` mode, those residual-style outputs can also be annotated with SAE features from the teacher model's interpretability stack. Contrast vectors were computed from the [RAID](https://raid-bench.xyz/) training dataset.
+`fast-ai-detector` is a local CLI for predicting whether text was AI-written. The core model is a very small distilled transformer (~40M param) that approximates mean-pooled residual representations from a larger (4B param) [Gemma model](https://huggingface.co/google/gemma-3-4b-pt). Those residual-style outputs can be annotated with SAE features from the original Gemma model's interpretability stack. Contrast vectors were computed from the [RAID](https://raid-bench.xyz/) training dataset.
 
 Modes:
 - `contrast` (default): contrast-based prediction and SAE-based document feature inspection
