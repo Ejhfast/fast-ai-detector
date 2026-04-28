@@ -100,6 +100,41 @@ text,label,tags,fast_ai_detector_label,fast_ai_detector_score,fast_ai_detector_h
 "I love these stories. The characters are complex and relatable, and the plot twists keep me on the edge of my seat. The writing style is engaging and descriptive, making it easy to immerse myself in the world of the story. Each tale is unique and captivating, and I find myself thinking about them long after I've finished reading. I highly recommend these stories to anyone looking for thought-provoking and entertaining reads.",1,"['reviews', 'gpt-3.5-turbo-1106']",ai,423.319458,94.671712
 ```
 
+### Vector Export
+
+You can also use the CLI to export the distilled document representations directly. This is useful if you want to run your own clustering, nearest-neighbor search, contrast-vector experiments, or SAE projection analysis outside the detector.
+
+```bash
+fast-ai-detector \
+  --input examples/pangram_benchmark.csv \
+  --text-column text \
+  --export-vectors pangram_vectors.npy
+```
+
+By default this writes an `N x 2560` float32 `.npy` matrix containing the student-predicted Gemma 3 4B layer-17 mean residual representation for each row. For `.npy` output, the CLI also writes `pangram_vectors.metadata.csv` with row indices and the original input columns, plus `pangram_vectors.npy.json` with a small manifest.
+
+Supported vector outputs:
+
+- `.npy`: vectors only, plus sidecar metadata and manifest files
+- `.npz`: compressed archive containing `vectors`, `row_index`, and `manifest_json`
+- `.csv` / `.tsv`: original columns plus `vector_0000` ... `vector_2559`
+
+Available vector spaces:
+
+- `raw` (default): predicted Gemma layer-17 mean residual vector
+- `student-z`: raw vector normalized by the student checkpoint's target mean and scale
+- `detector-z`: raw vector normalized by the contrast detector's mean and scale
+
+Example:
+
+```bash
+fast-ai-detector \
+  --input examples/pangram_benchmark.csv \
+  --text-column text \
+  --export-vectors pangram_detector_z.npz \
+  --vector-space detector-z
+```
+
 ## SAE
 
 `contrast` mode can also expose document-level SAE annotations derived from the Gemma interpretability stack the student was distilled from.

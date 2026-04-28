@@ -10,7 +10,7 @@ from safetensors.torch import load_file
 
 from .feature_lookup import FeatureLookupRow, load_feature_lookup
 from .inference import FastAIDetector
-from .models import UnsupervisedState, _download_hf_file, load_manifest, tokenize_batch
+from .models import UnsupervisedState, _download_hf_file, load_manifest
 
 
 @dataclass
@@ -157,21 +157,7 @@ class UnsupervisedSAEExplainer:
         *,
         batch_size: int = 64,
     ) -> torch.Tensor:
-        clean_texts = ["" if text is None else str(text) for text in texts]
-        student = self.state.student
-        chunks: list[torch.Tensor] = []
-        use_amp = student.device.type == "cuda"
-        with torch.no_grad():
-            for start in range(0, len(clean_texts), batch_size):
-                batch_texts = clean_texts[start : start + batch_size]
-                tokens = tokenize_batch(student.tokenizer, batch_texts, student.max_length, student.device)
-                with torch.autocast(device_type="cuda", dtype=torch.bfloat16, enabled=use_amp):
-                    pred_z = student.model(tokens["input_ids"], tokens["attention_mask"])
-                    pred_raw = pred_z * student.target_scale + student.target_mean
-                chunks.append(pred_raw.float())
-        if not chunks:
-            return torch.empty((0, self.bundle.d_in), device=student.device, dtype=torch.float32)
-        return torch.cat(chunks, dim=0)
+        return self.detector.predict_raw_representations(texts, batch_size=batch_size)
 
     def detector_scores_from_raw(self, raw_reps: torch.Tensor) -> torch.Tensor:
         z = (raw_reps - self.bundle.transform_mean.to(raw_reps.dtype)) / self.bundle.transform_scale.to(raw_reps.dtype)

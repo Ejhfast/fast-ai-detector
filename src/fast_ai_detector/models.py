@@ -9,12 +9,14 @@ from typing import Literal
 
 import numpy as np
 import torch
+from huggingface_hub.constants import HUGGINGFACE_HUB_CACHE
 from huggingface_hub import hf_hub_download, try_to_load_from_cache
 from huggingface_hub.errors import LocalEntryNotFoundError
 from torch import nn
 from transformers import AutoTokenizer
 
 Mode = Literal["contrast", "raid-finetune"]
+LongDocMode = Literal["truncate", "chunk-mean"]
 
 
 def _assets_root() -> Path:
@@ -38,6 +40,14 @@ def _download_hf_file(spec: dict[str, object]) -> Path:
     )
     if isinstance(cached, str):
         return Path(cached)
+
+    # Offline-friendly fallback: a repo may have multiple cached snapshots, and
+    # refs/main can point at a snapshot that does not contain older files.
+    repo_cache = Path(HUGGINGFACE_HUB_CACHE) / f"models--{repo_id.replace('/', '--')}"
+    if repo_cache.exists():
+        matches = sorted((repo_cache / "snapshots").glob(f"*/{filename}"))
+        if matches:
+            return matches[-1]
 
     # If the file is already cached locally, do not trigger a network check.
     try:
@@ -140,6 +150,8 @@ def load_tokenizer():
     tokenizer = AutoTokenizer.from_pretrained(_assets_root() / "tokenizer", use_fast=True, local_files_only=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+    if hasattr(tokenizer, "deprecation_warnings"):
+        tokenizer.deprecation_warnings["Asking-to-pad-a-fast-tokenizer"] = True
     return tokenizer
 
 
@@ -154,6 +166,82 @@ def tokenize_batch(tokenizer, texts: list[str], max_length: int, device: torch.d
     return {
         "input_ids": encoded["input_ids"].to(device, non_blocking=True),
         "attention_mask": encoded["attention_mask"].to(device, non_blocking=True).bool(),
+    }
+
+
+@dataclass
+class ChunkRecord:
+    doc_index: int
+    input_ids: list[int]
+    attention_mask: list[int]
+    chunk_weight: float
+
+
+def build_chunk_records(tokenizer, texts: list[str], max_length: int) -> list[ChunkRecord]:
+    special_tokens = int(tokenizer.num_special_tokens_to_add(pair=False))
+    content_max_length = max_length - special_tokens
+    if content_max_length <= 0:
+        raise ValueError(
+            f"Model max_length={max_length} is too small for tokenizer special tokens={special_tokens}."
+        )
+    encoded = tokenizer(
+        texts,
+        add_special_tokens=False,
+        return_attention_mask=False,
+        return_token_type_ids=False,
+    )
+    records: list[ChunkRecord] = []
+    for doc_index, token_ids in enumerate(encoded["input_ids"]):
+        if token_ids:
+            content_chunks = [token_ids[start : start + content_max_length] for start in range(0, len(token_ids), content_max_length)]
+        else:
+            content_chunks = [[]]
+        for content_ids in content_chunks:
+            prepared = tokenizer.prepare_for_model(
+                content_ids,
+                add_special_tokens=True,
+                padding=False,
+                truncation=False,
+                return_attention_mask=True,
+            )
+            records.append(
+                ChunkRecord(
+                    doc_index=doc_index,
+                    input_ids=list(prepared["input_ids"]),
+                    attention_mask=list(prepared["attention_mask"]),
+                    chunk_weight=float(max(len(content_ids), 1)),
+                )
+            )
+    return records
+
+
+def pack_chunk_records(tokenizer, records: list[ChunkRecord], max_length: int, device: torch.device) -> dict[str, torch.Tensor]:
+    if not records:
+        raise ValueError("pack_chunk_records requires at least one chunk record.")
+    pad_token_id = int(tokenizer.pad_token_id)
+    padding_side = str(getattr(tokenizer, "padding_side", "right"))
+    input_ids = torch.full((len(records), max_length), pad_token_id, dtype=torch.long)
+    attention_mask = torch.zeros((len(records), max_length), dtype=torch.bool)
+    doc_indices = torch.empty(len(records), dtype=torch.long)
+    chunk_weights = torch.empty(len(records), dtype=torch.float32)
+    for row_index, record in enumerate(records):
+        seq_len = len(record.input_ids)
+        if seq_len > max_length:
+            raise ValueError(f"Chunk length {seq_len} exceeds max_length {max_length}.")
+        if padding_side == "left":
+            start = max_length - seq_len
+        else:
+            start = 0
+        end = start + seq_len
+        input_ids[row_index, start:end] = torch.tensor(record.input_ids, dtype=torch.long)
+        attention_mask[row_index, start:end] = torch.tensor(record.attention_mask, dtype=torch.bool)
+        doc_indices[row_index] = int(record.doc_index)
+        chunk_weights[row_index] = float(record.chunk_weight)
+    return {
+        "input_ids": input_ids.to(device, non_blocking=True),
+        "attention_mask": attention_mask.to(device, non_blocking=True),
+        "doc_indices": doc_indices.to(device, non_blocking=True),
+        "chunk_weights": chunk_weights.to(device, non_blocking=True),
     }
 
 
